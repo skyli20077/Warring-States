@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>左传 · 地理考证全览 / Zuo Zhuan · Geographic Atlas</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .leaflet-control-attribution { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Icons = {
+            Flag: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>,
+            Landmark: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="22" y2="12"/><line x1="18" x2="18" y1="22" y2="12"/><line x1="6" x2="18" y1="12" y2="12"/><path d="M10 12V9a2 2 0 0 1 2-2 2 2 0 0 1 2 2v3"/><path d="M12 2L3 7v2h18V7l-9-5z"/></svg>,
+            Users: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            MapPin: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            BookOpen: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+            X: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Calendar: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            ScrollText: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg>,
+            Feather: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" x2="2" y1="8" y2="22"/><line x1="17.5" x2="9" y1="15" y2="15"/></svg>,
+            Navigation: (props) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        };
+
+        // ============================================================
+        // UI strings / 界面文案
+        // ============================================================
+        const UI = {
+            zh: {
+                mapTitle: '左传 · 地理考证全览',
+                mapSubtitle: '包含城濮、楚丘、践土、衡雍、洛邑、召陵、申、郢、曲沃、绛',
+                date: '时间节点', loc: '今地考证', statesLabel: '涉及诸侯',
+                history: '历史沿革', impact: '影响：',
+                quotesH: '左传原文考证', poemsH: '诗词引经',
+                toggle: 'EN', ctextLink: '在 ctext.org 查看'
+            },
+            en: {
+                mapTitle: 'Zuo Zhuan · A Geographic Atlas',
+                mapSubtitle: 'Featuring Chengpu, Chuqiu, Jiantu, Hengyong, Luoyi, Shaoling, Shen, Ying, Quwo & Jiang',
+                date: 'Date', loc: 'Modern Location', statesLabel: 'States Involved',
+                history: 'Historical Background', impact: 'Impact: ',
+                quotesH: 'Zuo Zhuan — Source Passages', poemsH: 'Poetry & Allusions',
+                toggle: '中文', ctextLink: 'View on ctext.org'
+            }
+        };
+
+        // ctext.org chapter URLs by Zuo Zhuan year (for source deep-links)
+        const CTEXT = 'https://ctext.org/chun-qiu-zuo-zhuan/';
+
+        // ============================================================
+        // DATA / 数据  (English translations of citations are editorial,
+        // provided alongside the original; each links to its ctext page.)
+        // ============================================================
+        const FULL_DATA = [
+            {
+                id: 'chengpu', lat: 35.58, lng: 115.55, type: 'battle',
+                title: { zh: '城濮 (Chéng Pú)', en: 'Chengpu 城濮' },
+                subTitle: { zh: '晋楚争霸的关键战场', en: 'The decisive battlefield in the Jin–Chu struggle for hegemony' },
+                time: { zh: '鲁僖公二十八年 (前632年)', en: '28th year of Duke Xi of Lu (632 BCE)' },
+                modernLoc: { zh: '山东鄄城西南 / 河南滑县一带', en: 'SW of Juancheng, Shandong / around Hua County, Henan' },
+                states: { zh: ['晋国','楚国','宋国','齐国','秦国'], en: ['Jin','Chu','Song','Qi','Qin'] },
+                figures: { zh: ['晋文公','子玉','先轸'], en: ['Duke Wen of Jin','Ziyu','Xian Zhen'] },
+                process: { zh: '晋文公为报答楚成王礼遇，令军队“退避三舍”。楚将子玉轻敌冒进，晋军利用地形优势，配合齐秦联军大败楚军。',
+                           en: 'To repay the courtesy once shown him by King Cheng of Chu, Duke Wen of Jin ordered his army to "retreat three stages" (tui bi san she). The Chu commander Ziyu, underestimating his foe, pressed recklessly on; exploiting the terrain and joined by Qi and Qin forces, the Jin army routed the Chu host.' },
+                impact: { zh: '晋文公确立霸业，奠定了中原局势。', en: 'Duke Wen of Jin secured his hegemony, setting the shape of the Central Plains order.' },
+                quotes: [
+                    { text: '夏四月戊辰，晋侯、宋公、齐国归父、崔夭、秦小子懿次于城濮。',
+                      trans: 'In summer, in the fourth month, on the day wuchen, the Marquis of Jin, the Duke of Song, Guo Guifu and Cui Yao of Qi, and Xiaozi Yi of Qin halted at Chengpu.',
+                      source: { zh: '左传·僖公二十八年', en: 'Zuo Zhuan, Duke Xi yr. 28' }, ctext: CTEXT+'xi-gong-er-shi-ba-nian' },
+                    { text: '楚师背酅而舍，晋侯患之。',
+                      trans: 'The Chu army encamped with its back to the Xi heights, and the Marquis of Jin was troubled by it.',
+                      source: { zh: '左传·僖公二十八年', en: 'Zuo Zhuan, Duke Xi yr. 28' }, ctext: CTEXT+'xi-gong-er-shi-ba-nian',
+                      note: { zh: '“酅”是城濮附近的丘陵险阻之地。', en: '"Xi" was a hilly defile near Chengpu.' } }
+                ],
+                poems: []
+            },
+            {
+                id: 'chuqiu', lat: 35.40, lng: 114.52, type: 'capital',
+                title: { zh: '楚丘 (Chǔ Qiū)', en: 'Chuqiu 楚丘' },
+                subTitle: { zh: '卫国复国之地', en: 'Where the state of Wei was restored' },
+                time: { zh: '鲁闵公二年、僖公二年等', en: '2nd year of Duke Min; 2nd year of Duke Xi, etc.' },
+                modernLoc: { zh: '河南滑县东八里营卫王殿遗址', en: 'Wei-Wangdian site at Baliying, east of Hua County, Henan' },
+                states: { zh: ['卫国','齐国','戎'], en: ['Wei','Qi','Rong'] },
+                figures: { zh: ['卫文公','齐桓公','凡伯'], en: ['Duke Wen of Wei','Duke Huan of Qi','the Earl of Fan'] },
+                process: { zh: '卫国被狄人攻破后，齐桓公联合诸侯帮助卫国在楚丘筑城，卫国得以重新立国。',
+                           en: 'After Wei was overrun by the Di, Duke Huan of Qi rallied the lords to help Wei build a city at Chuqiu, allowing the state to be re-founded.' },
+                impact: { zh: '体现了齐桓公“存亡继绝”的霸主作为。', en: 'A model of Duke Huan of Qi\'s hegemonic ideal of "preserving the perishing and continuing the cut-off."' },
+                quotes: [
+                    { text: '二年春，诸侯城楚丘而封卫焉。',
+                      trans: 'In the second year, in spring, the feudal lords walled Chuqiu and there enfeoffed [the ruler of] Wei.',
+                      source: { zh: '左传·僖公二年', en: 'Zuo Zhuan, Duke Xi yr. 2' }, ctext: CTEXT+'xi-gong-er-nian' },
+                    { text: '十二年春，诸侯城卫楚丘之郛，惧狄难也。',
+                      trans: 'In the twelfth year, in spring, the lords built the outer wall of Wei\'s Chuqiu, fearing trouble from the Di.',
+                      source: { zh: '左传·僖公十二年', en: 'Zuo Zhuan, Duke Xi yr. 12' }, ctext: CTEXT+'xi-gong-shi-er-nian' },
+                    { text: '戎伐凡伯于楚丘以归。',
+                      trans: 'The Rong attacked the Earl of Fan at Chuqiu and carried him off.',
+                      source: { zh: '左传·隐公七年', en: 'Zuo Zhuan, Duke Yin yr. 7' }, ctext: CTEXT+'yin-gong-qi-nian' }
+                ],
+                poems: [
+                    { text: '定之方中，作于楚宫。揆之以日，作于楚室……升彼虚矣，以望楚矣。',
+                      trans: 'When [the star] Ding stood at the zenith, he began the palace at Chu; gauging it by the sun, he raised the halls of Chu… He climbed those ruined heights and gazed out toward Chu.',
+                      author: { zh: '诗经', en: 'Book of Poetry' }, title: { zh: '鄘风·定之方中', en: 'Airs of Yong, "Ding zhi fang zhong"' },
+                      note: { zh: '歌颂卫文公营造宫室。', en: 'Celebrating Duke Wen of Wei\'s building of his palace. (tr. after Legge)' } }
+                ]
+            },
+            {
+                id: 'jiantu', lat: 35.05, lng: 113.85, type: 'alliance',
+                title: { zh: '践土 (Jiàn Tǔ)', en: 'Jiantu 践土' },
+                subTitle: { zh: '晋文公受命侯伯之地', en: 'Where Duke Wen of Jin was invested as Lord of the Covenant' },
+                time: { zh: '鲁僖公二十八年 (前632年)', en: '28th year of Duke Xi of Lu (632 BCE)' },
+                modernLoc: { zh: '河南原阳西南', en: 'SW of Yuanyang, Henan' },
+                states: { zh: ['晋国','周王室','郑国','宋国'], en: ['Jin','the Zhou royal house','Zheng','Song'] },
+                figures: { zh: ['晋文公','周襄王','王子虎'], en: ['Duke Wen of Jin','King Xiang of Zhou','Prince Hu'] },
+                process: { zh: '城濮之战后，晋文公在此建立王宫迎接周襄王，并举行会盟。',
+                           en: 'After the battle of Chengpu, Duke Wen of Jin built a royal palace here to receive King Xiang of Zhou and held a covenant of the lords.' },
+                impact: { zh: '标志着晋国霸业的法理化，“尊王攘夷”的成功实践。',
+                          en: 'It marked the legitimation of Jin\'s hegemony — a successful enactment of "revering the king and repelling the barbarians."' },
+                quotes: [
+                    { text: '甲午，至于衡雍，作王宫于践土。',
+                      trans: 'On the day jiawu, [the army] reached Hengyong, and a royal palace was built at Jiantu.',
+                      source: { zh: '左传·僖公二十八年', en: 'Zuo Zhuan, Duke Xi yr. 28' }, ctext: CTEXT+'xi-gong-er-shi-ba-nian' },
+                    { text: '夏，公会王子虎……盟于翟泉，寻践土之盟。',
+                      trans: 'In summer, the duke met Prince Hu … and they covenanted at Diquan, renewing the covenant of Jiantu.',
+                      source: { zh: '左传·僖公二十九年', en: 'Zuo Zhuan, Duke Xi yr. 29' }, ctext: CTEXT+'xi-gong-er-shi-jiu-nian' },
+                    { text: '晋士伯曰：自践土以来，宋何役之不会，而何盟之不同？',
+                      trans: 'Shi Bo of Jin said: "Since [the covenant of] Jiantu, in what campaign has Song not taken part, and in what covenant has it not joined?"',
+                      source: { zh: '左传·昭公二十五年', en: 'Zuo Zhuan, Duke Zhao yr. 25' }, ctext: CTEXT+'zhao-gong-er-shi-wu-nian' }
+                ],
+                poems: [
+                    { text: '葵丘践土非荒城，勿轻谈士弃儒生。',
+                      trans: 'Kuiqiu and Jiantu are no deserted towns — do not lightly dismiss the talking scholars and cast off the Confucians.',
+                      author: { zh: '李清照 (宋)', en: 'Li Qingzhao (Song)' }, title: { zh: '上枢密韩肖胄诗二首', en: 'To Privy Councillor Han Xiaozhou (two poems)' },
+                      note: { zh: '', en: 'No published ctext translation; rendering editorial.' } }
+                ]
+            },
+            {
+                id: 'hengyong', lat: 35.08, lng: 113.82, type: 'alliance',
+                title: { zh: '衡雍 (Héng Yōng)', en: 'Hengyong 衡雍' },
+                subTitle: { zh: '晋郑结盟与楚军驻地', en: 'Site of the Jin–Zheng covenant and a Chu encampment' },
+                time: { zh: '僖公二十八年、宣公十二年', en: '28th yr. of Duke Xi; 12th yr. of Duke Xuan' },
+                modernLoc: { zh: '河南原阳县西', en: 'West of Yuanyang County, Henan' },
+                states: { zh: ['晋国','郑国','楚国','鲁国'], en: ['Jin','Zheng','Chu','Lu'] },
+                figures: { zh: ['晋文公','郑伯','赵盾'], en: ['Duke Wen of Jin','the Earl of Zheng','Zhao Dun'] },
+                process: { zh: '晋文公回师到达衡雍，与郑伯结盟；后世邲之战楚军也曾驻扎于此。',
+                           en: 'Duke Wen of Jin reached Hengyong on his return march and covenanted with the Earl of Zheng; later, during the battle of Bi, the Chu army also encamped here.' },
+                impact: { zh: '重要的军事驻扎地与盟会场所。', en: 'An important military staging ground and covenant site.' },
+                quotes: [
+                    { text: '五月丙午，晋侯及郑伯盟于衡雍。',
+                      trans: 'In the fifth month, on the day bingwu, the Marquis of Jin and the Earl of Zheng covenanted at Hengyong.',
+                      source: { zh: '左传·僖公二十八年', en: 'Zuo Zhuan, Duke Xi yr. 28' }, ctext: CTEXT+'xi-gong-er-shi-ba-nian' },
+                    { text: '丙辰，楚重至于邲，遂次于衡雍。',
+                      trans: 'On the day bingchen, the Chu baggage train reached Bi, and then halted at Hengyong.',
+                      source: { zh: '左传·宣公十二年', en: 'Zuo Zhuan, Duke Xuan yr. 12' }, ctext: CTEXT+'xuan-gong-shi-er-nian' },
+                    { text: '冬，襄仲会晋赵盾，盟于衡雍，报扈之盟也。',
+                      trans: 'In winter, Xiangzhong met Zhao Dun of Jin and covenanted at Hengyong, in requital of the covenant of Hu.',
+                      source: { zh: '左传·文公八年', en: 'Zuo Zhuan, Duke Wen yr. 8' }, ctext: CTEXT+'wen-gong-ba-nian' }
+                ],
+                poems: []
+            },
+            {
+                id: 'luoyi', lat: 34.62, lng: 112.45, type: 'capital',
+                title: { zh: '洛邑 (Luò Yì)', en: 'Luoyi 洛邑' },
+                subTitle: { zh: '周王朝东都 / 天下之中', en: 'Eastern capital of the Zhou / the center of All-under-Heaven' },
+                time: { zh: '西周至东周', en: 'Western Zhou through Eastern Zhou' },
+                modernLoc: { zh: '河南洛阳', en: 'Luoyang, Henan' },
+                states: { zh: ['周王室'], en: ['the Zhou royal house'] },
+                figures: { zh: ['周武王','周平王','周襄王'], en: ['King Wu of Zhou','King Ping of Zhou','King Xiang of Zhou'] },
+                process: { zh: '周武王定鼎之地，平王东迁后的政治中心。包含“王城”与“成周”。',
+                           en: 'Where King Wu of Zhou "fixed the tripods," and the political center after King Ping moved east. It comprised the "Royal City" (Wangcheng) and "Chengzhou."' },
+                impact: { zh: '天下礼仪、政治名义上的核心。', en: 'The ritual and nominal political heart of the realm.' },
+                quotes: [
+                    { text: '武王克商，迁九鼎于洛邑。',
+                      trans: 'When King Wu conquered Shang, he removed the Nine Tripods to Luoyi.',
+                      source: { zh: '左传·桓公二年', en: 'Zuo Zhuan, Duke Huan yr. 2' }, ctext: CTEXT+'huan-gong-er-nian' },
+                    { text: '以狄师伐周……王出适郑……大叔以隗氏居于温。',
+                      trans: 'With Di troops he attacked Zhou … the king fled to Zheng … and Taishu, with the Wei woman, settled at Wen.',
+                      source: { zh: '左传·僖公二十四年', en: 'Zuo Zhuan, Duke Xi yr. 24' }, ctext: CTEXT+'xi-gong-er-shi-si-nian',
+                      note: { zh: '此处“周”即指洛邑。', en: 'Here "Zhou" refers to Luoyi.' } },
+                    { text: '冬，仲孙何忌会……诸侯……城成周。',
+                      trans: 'In winter, Zhongsun Heji joined … the feudal lords … in walling Chengzhou.',
+                      source: { zh: '左传·昭公三十二年', en: 'Zuo Zhuan, Duke Zhao yr. 32' }, ctext: CTEXT+'zhao-gong-san-shi-er-nian' }
+                ],
+                poems: [
+                    { text: '瞻彼洛矣，维水泱泱。君子至止，福禄如茨。',
+                      trans: 'Behold the Luo, its waters broad and deep; our lord arrives — blessings and honors gather thick as thatch.',
+                      author: { zh: '诗经', en: 'Book of Poetry' }, title: { zh: '小雅·瞻彼洛矣', en: 'Minor Odes, "Zhan bi Luo yi"' },
+                      note: { zh: '', en: 'tr. after Legge.' } },
+                    { text: '洛邑从来天地中，嵩高苍翠北邙红。',
+                      trans: 'Luoyi has ever been the center of heaven and earth — Mount Song green and towering, Beimang\'s slopes red.',
+                      author: { zh: '苏轼 (宋)', en: 'Su Shi (Song)' }, title: { zh: '追和子由去岁试举人洛下所寄', en: 'Replying to Ziyou\'s poem sent from Luo last year' },
+                      note: { zh: '', en: 'No ctext translation; rendering editorial.' } },
+                    { text: '何时还洛邑，马上垂金紫。',
+                      trans: 'When shall I return to Luoyi, riding with the gold-and-purple of office hanging at my waist?',
+                      author: { zh: '岑参 (唐)', en: 'Cen Shen (Tang)' }, title: { zh: '终南山双峰草堂作', en: 'Written at the Twin-Peak Thatched Hall, Mt. Zhongnan' },
+                      note: { zh: '', en: 'No ctext translation; rendering editorial.' } }
+                ]
+            },
+            {
+                id: 'zhaoling', lat: 33.58, lng: 114.05, type: 'alliance',
+                title: { zh: '召陵 (Shào Líng)', en: 'Shaoling 召陵' },
+                subTitle: { zh: '齐桓公霸业顶峰', en: 'The summit of Duke Huan of Qi\'s hegemony' },
+                time: { zh: '鲁僖公四年 (前656年)', en: '4th year of Duke Xi of Lu (656 BCE)' },
+                modernLoc: { zh: '河南漯河召陵区', en: 'Shaoling District, Luohe, Henan' },
+                states: { zh: ['齐国','楚国','鲁国','宋国'], en: ['Qi','Chu','Lu','Song'] },
+                figures: { zh: ['齐桓公','管仲','屈完'], en: ['Duke Huan of Qi','Guan Zhong','Qu Wan'] },
+                process: { zh: '齐桓公率诸侯联军伐楚，楚国服软，双方在召陵结盟。',
+                           en: 'Duke Huan of Qi led the allied lords against Chu; Chu yielded, and the two sides made a covenant at Shaoling.' },
+                impact: { zh: '遏制了楚国北进，维护了周礼秩序，齐桓公“尊王攘夷”的高光时刻。',
+                          en: 'It checked Chu\'s northward advance and upheld the Zhou ritual order — the high point of Duke Huan\'s "revering the king and repelling the barbarians."' },
+                quotes: [
+                    { text: '师退，次于召陵。',
+                      trans: 'The army withdrew and halted at Shaoling.',
+                      source: { zh: '左传·僖公四年', en: 'Zuo Zhuan, Duke Xi yr. 4' }, ctext: CTEXT+'xi-gong-si-nian' },
+                    { text: '楚子使与师言曰：“君处北海，寡人处南海……不虞君之涉吾地也，何故？”',
+                      trans: 'The Viscount of Chu sent an envoy to address the army: "You, my lord, dwell by the Northern Sea, and I by the Southern Sea … I never expected you to cross into my land — for what reason have you come?"',
+                      source: { zh: '左传·僖公四年', en: 'Zuo Zhuan, Duke Xi yr. 4' }, ctext: CTEXT+'xi-gong-si-nian' }
+                ],
+                poems: []
+            },
+            {
+                id: 'shen', lat: 33.00, lng: 112.53, type: 'state',
+                title: { zh: '申 (Shēn)', en: 'Shen 申' },
+                subTitle: { zh: '姜姓古国 / 楚国北方重镇', en: 'An ancient Jiang-clan state / Chu\'s key northern stronghold' },
+                time: { zh: '西周至春秋', en: 'Western Zhou through the Spring & Autumn period' },
+                modernLoc: { zh: '河南南阳一带', en: 'Around Nanyang, Henan' },
+                states: { zh: ['申国','楚国','郑国'], en: ['Shen','Chu','Zheng'] },
+                figures: { zh: ['申伯','楚文王','巫臣'], en: ['the Earl of Shen','King Wen of Chu','Wu Chen'] },
+                process: { zh: '原为姜姓诸侯国，后被楚国吞并成为县，是楚国防御北方晋、郑的战略要地。',
+                           en: 'Originally a Jiang-clan vassal state, later annexed by Chu and made a county; a strategic point for Chu\'s defense against Jin and Zheng to the north.' },
+                impact: { zh: '楚国北进中原的跳板。', en: 'A springboard for Chu\'s advance into the Central Plains.' },
+                quotes: [
+                    { text: '郑武公娶于申，曰武姜。',
+                      trans: 'Duke Wu of Zheng took a wife from Shen, called Wu Jiang.',
+                      source: { zh: '左传·隐公元年', en: 'Zuo Zhuan, Duke Yin yr. 1' }, ctext: CTEXT+'yin-gong-yuan-nian' },
+                    { text: '楚文王伐申，过邓。',
+                      trans: 'King Wen of Chu attacked Shen, passing through Deng.',
+                      source: { zh: '左传·庄公六年', en: 'Zuo Zhuan, Duke Zhuang yr. 6' }, ctext: CTEXT+'zhuang-gong-liu-nian' },
+                    { text: '此申、吕所以邑也，是以为赋，以御北方。',
+                      trans: 'This is why Shen and Lü were made into towns — to raise levies from them and so guard the northern frontier.',
+                      source: { zh: '左传·成公七年', en: 'Zuo Zhuan, Duke Cheng yr. 7' }, ctext: CTEXT+'cheng-gong-qi-nian' }
+                ],
+                poems: [
+                    { text: '彼其之子，不与我戍申。',
+                      trans: 'That dear one of mine is not here, keeping guard at Shen with me.',
+                      author: { zh: '诗经', en: 'Book of Poetry' }, title: { zh: '王风·扬之水', en: 'Airs of Wang, "Yang zhi shui"' },
+                      note: { zh: '', en: 'tr. after Legge.' } },
+                    { text: '维岳降神，生甫及申……申伯信迈，王饯于郿。',
+                      trans: 'The high peaks sent down a spirit, who gave birth to [the lords of] Fu and Shen… The Earl of Shen was truly setting forth, and the king feasted him in farewell at Mei.',
+                      author: { zh: '诗经', en: 'Book of Poetry' }, title: { zh: '大雅·崧高', en: 'Major Odes, "Song gao"' },
+                      note: { zh: '', en: 'tr. after Legge.' } }
+                ]
+            },
+            {
+                id: 'ying', lat: 30.33, lng: 112.23, type: 'capital',
+                title: { zh: '郢 (Yǐng)', en: 'Ying 郢' },
+                subTitle: { zh: '楚国四百年都城', en: 'Capital of Chu for four centuries' },
+                time: { zh: '春秋战国', en: 'Spring & Autumn and Warring States periods' },
+                modernLoc: { zh: '湖北荆州纪南城', en: 'Jinan City site, Jingzhou, Hubei' },
+                states: { zh: ['楚国','吴国'], en: ['Chu','Wu'] },
+                figures: { zh: ['楚昭王','伍子胥','孙武'], en: ['King Zhao of Chu','Wu Zixu','Sun Wu (Sunzi)'] },
+                process: { zh: '楚国政治中心。鲁定公四年，吴国攻破郢都。',
+                           en: 'The political center of Chu. In the 4th year of Duke Ding of Lu, Wu stormed the Ying capital.' },
+                impact: { zh: '南方文明中心。', en: 'A center of southern civilization.' },
+                quotes: [
+                    { text: '冬，蔡侯、吴子、唐侯伐楚。……五战，及郢。',
+                      trans: 'In winter, the Marquis of Cai, the Viscount of Wu, and the Marquis of Tang attacked Chu … after five battles they reached Ying.',
+                      source: { zh: '左传·定公四年', en: 'Zuo Zhuan, Duke Ding yr. 4' }, ctext: CTEXT+'ding-gong-si-nian' },
+                    { text: '君次郊郢，以御四邑。',
+                      trans: 'Let our ruler encamp at Jiaoying, to defend the four towns.',
+                      source: { zh: '左传·桓公十一年', en: 'Zuo Zhuan, Duke Huan yr. 11' }, ctext: CTEXT+'huan-gong-shi-yi-nian' },
+                    { text: '楚囊玒为令尹，城郢。',
+                      trans: 'Nangwa of Chu became chief minister (lingyin) and walled Ying.',
+                      source: { zh: '左传·昭公二十三年', en: 'Zuo Zhuan, Duke Zhao yr. 23' }, ctext: CTEXT+'zhao-gong-er-shi-san-nian' }
+                ],
+                poems: [
+                    { text: '发郢都而去闾兮，怊荒忽其焉极？',
+                      trans: 'Setting out from the capital Ying, leaving the gate of home — distraught and adrift, where shall it ever end?',
+                      author: { zh: '屈原', en: 'Qu Yuan' }, title: { zh: '楚辞·九章·哀郢', en: 'Chu Ci, Nine Pieces, "Ai Ying" (Lament for Ying)' },
+                      note: { zh: '', en: 'Original on ctext.org/chu-ci; rendering editorial.' }, ctext: 'https://ctext.org/chu-ci' },
+                    { text: '惟郢路之辽远兮，江与夏之不可涉。',
+                      trans: 'Only the road to Ying stretches far, far away; the Jiang and the Xia cannot be forded.',
+                      author: { zh: '屈原', en: 'Qu Yuan' }, title: { zh: '楚辞·九章·哀郢', en: 'Chu Ci, Nine Pieces, "Ai Ying"' },
+                      note: { zh: '', en: 'Original on ctext.org/chu-ci; rendering editorial.' }, ctext: 'https://ctext.org/chu-ci' }
+                ]
+            },
+            {
+                id: 'quwo', lat: 35.35, lng: 111.48, type: 'city',
+                title: { zh: '曲沃 (Qū Wò)', en: 'Quwo 曲沃' },
+                subTitle: { zh: '晋国小宗夺权基地', en: 'Power base from which the Jin cadet line seized rule' },
+                time: { zh: '春秋早期', en: 'Early Spring & Autumn period' },
+                modernLoc: { zh: '山西闻喜县东北', en: 'NE of Wenxi County, Shanxi' },
+                states: { zh: ['晋国'], en: ['Jin'] },
+                figures: { zh: ['曲沃桓叔','曲沃庄伯','曲沃武公'], en: ['Huanshu of Quwo','Zhuangbo of Quwo','Wugong of Quwo'] },
+                process: { zh: '晋国公室内乱，曲沃一系经过长期斗争，最终取代翼城大宗成为晋国国君。',
+                           en: 'Amid strife in the Jin ducal house, the Quwo branch, after a long struggle, finally supplanted the senior line at Yicheng to become rulers of Jin.' },
+                impact: { zh: '“曲沃代翼”是春秋礼崩乐坏的典型事件。',
+                          en: 'The "Quwo supplanting Yi" is a textbook case of the Spring-and-Autumn collapse of ritual order.' },
+                quotes: [
+                    { text: '曲沃庄伯以郑人、邢人伐翼。',
+                      trans: 'Zhuangbo of Quwo, with men of Zheng and men of Xing, attacked Yi.',
+                      source: { zh: '左传·隐公五年', en: 'Zuo Zhuan, Duke Yin yr. 5' }, ctext: CTEXT+'yin-gong-wu-nian' },
+                    { text: '三年春，曲沃武公伐翼，次于陉庭。',
+                      trans: 'In the third year, in spring, Wugong of Quwo attacked Yi and halted at Xingting.',
+                      source: { zh: '左传·桓公三年', en: 'Zuo Zhuan, Duke Huan yr. 3' }, ctext: CTEXT+'huan-gong-san-nian' },
+                    { text: '故封桓叔于曲沃，靖侯之孙栾宾傅之。',
+                      trans: 'Therefore [the ruler] enfeoffed Huanshu at Quwo, and Luan Bin, grandson of Marquis Jing, served as his guardian.',
+                      source: { zh: '左传·桓公二年', en: 'Zuo Zhuan, Duke Huan yr. 2' }, ctext: CTEXT+'huan-gong-er-nian' }
+                ],
+                poems: [
+                    { text: '素衣朱襮，从子于沃。',
+                      trans: 'In white robes with vermilion collars, they will follow you to Wo [Quwo].',
+                      author: { zh: '诗经', en: 'Book of Poetry' }, title: { zh: '唐风·扬之水', en: 'Airs of Tang, "Yang zhi shui"' },
+                      note: { zh: '', en: 'tr. after Legge.' } }
+                ]
+            },
+            {
+                id: 'jiang', lat: 35.62, lng: 111.73, type: 'capital',
+                title: { zh: '绛 (Jiàng)', en: 'Jiang 绛' },
+                subTitle: { zh: '晋国核心都城', en: 'The principal capital of Jin' },
+                time: { zh: '春秋中后期', en: 'Middle-to-late Spring & Autumn period' },
+                modernLoc: { zh: '山西翼城(故绛) / 侯马(新绛)', en: 'Yicheng, Shanxi (Old Jiang) / Houma (New Jiang)' },
+                states: { zh: ['晋国'], en: ['Jin'] },
+                figures: { zh: ['士蒍','晋景公'], en: ['Shi Wei','Duke Jing of Jin'] },
+                process: { zh: '晋国长期都城。分为“故绛”和后来迁往的“新田”（新绛）。',
+                           en: 'The long-standing capital of Jin, comprising "Old Jiang" and the later seat at Xintian ("New Jiang").' },
+                impact: { zh: '晋国霸业的政治指挥中心。', en: 'The political command center of Jin\'s hegemony.' },
+                quotes: [
+                    { text: '士蒍城绛，以深其宫。',
+                      trans: 'Shi Wei walled Jiang, deepening the defenses of its palace.',
+                      source: { zh: '左传·庄公二十六年', en: 'Zuo Zhuan, Duke Zhuang yr. 26' }, ctext: CTEXT+'zhuang-gong-er-shi-liu-nian' },
+                    { text: '晋人谋去故绛……晋迁于新田。',
+                      trans: 'The men of Jin deliberated leaving Old Jiang … and Jin removed [its capital] to Xintian.',
+                      source: { zh: '左传·成公六年', en: 'Zuo Zhuan, Duke Cheng yr. 6' }, ctext: CTEXT+'cheng-gong-liu-nian' }
+                ],
+                poems: [
+                    { text: '炎天故绛路，千里麦花香。',
+                      trans: 'Under a blazing sky, the road to Old Jiang — a thousand li fragrant with wheat blossom.',
+                      author: { zh: '卢纶 (唐)', en: 'Lu Lun (Tang)' }, title: { zh: '送绛州郭参军', en: 'Seeing off Adjutant Guo to Jiangzhou' },
+                      note: { zh: '', en: 'No ctext translation; rendering editorial.' } },
+                    { text: '登车君莫望，故绛柳条春。',
+                      trans: 'As you mount the carriage, my lord, do not gaze back; at Old Jiang the willow branches are green with spring.',
+                      author: { zh: '李端 (唐)', en: 'Li Duan (Tang)' }, title: { zh: '送郭参军赴绛州', en: 'Seeing off Adjutant Guo on his way to Jiangzhou' },
+                      note: { zh: '', en: 'No ctext translation; rendering editorial.' } },
+                    { text: '洛桥歌酒今朝散，绛路风烟几日行？',
+                      trans: 'The songs and wine at Luo Bridge disperse this morning; how many days on the Jiang road through wind and haze?',
+                      author: { zh: '白居易 (唐)', en: 'Bai Juyi (Tang)' }, title: { zh: '皇甫郎中亲家翁...', en: 'To my in-law, Director Huangfu …' },
+                      note: { zh: '', en: 'No ctext translation; rendering editorial.' } }
+                ]
+            }
+        ];
+
+        const TYPE_CONFIG = {
+            battle:   { color: '#ef4444', label: { zh: '战役', en: 'Battle' }, icon: Icons.Flag },
+            capital:  { color: '#9333ea', label: { zh: '都城', en: 'Capital' }, icon: Icons.Landmark },
+            alliance: { color: '#3b82f6', label: { zh: '会盟', en: 'Covenant' }, icon: Icons.Users },
+            state:    { color: '#ea580c', label: { zh: '封国', en: 'Vassal State' }, icon: Icons.MapPin },
+            city:     { color: '#059669', label: { zh: '城邑', en: 'City / Town' }, icon: Icons.Landmark },
+        };
+
+        function ZuoZhuanMap() {
+            const mapContainerRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            const markersLayerRef = useRef(null);
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [lang, setLang] = useState('zh');
+            const t = UI[lang];
+
+            // Map init (once)
+            useEffect(() => {
+                if (!mapContainerRef.current || mapInstanceRef.current) return;
+                const map = L.map(mapContainerRef.current, {
+                    center: [34.0, 113.5], zoom: 6, zoomControl: false, attributionControl: false
+                });
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+                mapInstanceRef.current = map;
+                markersLayerRef.current = L.layerGroup().addTo(map);
+                return () => {
+                    if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+                };
+            }, []);
+
+            // (Re)build markers whenever language changes
+            useEffect(() => {
+                const map = mapInstanceRef.current;
+                const layer = markersLayerRef.current;
+                if (!map || !layer) return;
+                layer.clearLayers();
+                FULL_DATA.forEach(item => {
+                    const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.capital;
+                    const customIcon = L.divIcon({
+                        className: 'custom-marker',
+                        html: `
+                            <div class="flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 group cursor-pointer">
+                                <div class="relative flex items-center justify-center transition-transform transform group-hover:scale-110 duration-200">
+                                    <div class="w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 border-white text-white" style="background-color: ${config.color};">
+                                        <div class="w-2.5 h-2.5 bg-white rounded-full"></div>
+                                    </div>
+                                    <div class="absolute -bottom-1 w-2 h-2 bg-slate-800 rotate-45 opacity-50"></div>
+                                </div>
+                                <div class="mt-1 px-2 py-0.5 bg-white/90 backdrop-blur border border-slate-200 text-slate-800 text-xs font-bold rounded shadow-sm whitespace-nowrap group-hover:bg-slate-800 group-hover:text-white transition-colors">
+                                    ${item.title[lang]}
+                                </div>
+                            </div>`,
+                        iconSize: [0, 0],
+                    });
+                    const marker = L.marker([item.lat, item.lng], { icon: customIcon }).addTo(layer);
+                    marker.on('click', () => {
+                        // Open details only. Do not move the map.
+                        setSelectedItem(item);
+                    });
+                });
+            }, [lang]);
+
+            const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
+            const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
+            const handleReset = () => { mapInstanceRef.current?.flyTo([34.0, 113.5], 6); setSelectedItem(null); };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-100 overflow-hidden relative font-sans">
+                    <div className="flex-1 relative h-full z-0">
+                        <div ref={mapContainerRef} className="w-full h-full bg-slate-200 z-0" />
+
+                        <div className="absolute bottom-6 left-6 z-[400] flex flex-col gap-2">
+                            <button onClick={handleZoomIn} className="p-2 bg-white rounded shadow text-slate-700 hover:bg-slate-50 font-bold text-lg w-10 h-10 flex items-center justify-center">+</button>
+                            <button onClick={handleZoomOut} className="p-2 bg-white rounded shadow text-slate-700 hover:bg-slate-50 font-bold text-lg w-10 h-10 flex items-center justify-center">-</button>
+                            <button onClick={handleReset} className="p-2 bg-white rounded shadow text-slate-700 hover:bg-slate-50 w-10 h-10 flex items-center justify-center">
+                                <Icons.Navigation className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="absolute top-4 left-4 z-[400] bg-white/95 backdrop-blur px-4 py-3 rounded-lg shadow-md border border-slate-200">
+                            <div className="flex items-start justify-between gap-4">
+                                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    <Icons.BookOpen className="w-6 h-6 text-purple-700" />
+                                    {t.mapTitle}
+                                </h1>
+                                <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
+                                    className="shrink-0 text-xs font-bold px-2.5 py-1 border border-slate-300 rounded text-slate-600 hover:bg-slate-100 transition-colors">
+                                    {t.toggle}
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">{t.mapSubtitle}</p>
+                        </div>
+                    </div>
+
+                    <div
+                        style={{ transform: selectedItem ? 'translateX(0)' : 'translateX(100%)' }}
+                        className={`
+                        absolute right-0 top-0 bottom-0 z-[500]
+                        w-full md:w-[480px] bg-white shadow-2xl
+                        transition-transform duration-300 ease-in-out
+                        border-l border-slate-200 overflow-hidden flex flex-col
+                    `}>
+                        {selectedItem && (() => {
+                            const Config = TYPE_CONFIG[selectedItem.type] || TYPE_CONFIG.capital;
+                            const ConfigIcon = Config.icon;
+                            return (
+                                <>
+                                    <div className="p-6 pb-4 border-b border-slate-100 bg-slate-50 relative shrink-0">
+                                        <button onClick={() => setSelectedItem(null)}
+                                            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors">
+                                            <Icons.X className="w-5 h-5" />
+                                        </button>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="px-2 py-0.5 text-xs font-bold text-white rounded uppercase tracking-wider flex items-center gap-1" style={{ backgroundColor: Config.color }}>
+                                                <ConfigIcon className="w-3 h-3" />
+                                                {Config.label[lang]}
+                                            </span>
+                                            <span className="text-xs text-slate-500 font-mono">ID: {selectedItem.id.toUpperCase()}</span>
+                                        </div>
+                                        <h2 className="text-3xl font-bold text-slate-900 mb-1">{selectedItem.title[lang]}</h2>
+                                        <p className="text-slate-600 text-sm">{selectedItem.subTitle[lang]}</p>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                                        <div className="grid grid-cols-1 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                            <div className="flex gap-3 items-start">
+                                                <Icons.Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <div className="text-xs text-slate-500 font-bold uppercase">{t.date}</div>
+                                                    <div className="text-sm text-slate-800">{selectedItem.time[lang]}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3 items-start">
+                                                <Icons.MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <div className="text-xs text-slate-500 font-bold uppercase">{t.loc}</div>
+                                                    <div className="text-sm text-slate-800">{selectedItem.modernLoc[lang]}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3 items-start">
+                                                <Icons.Flag className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <div className="text-xs text-slate-500 font-bold uppercase">{t.statesLabel}</div>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {selectedItem.states[lang].map(s => (
+                                                            <span key={s} className="text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{s}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">
+                                                <Icons.ScrollText className="w-4 h-4 text-blue-600" />
+                                                {t.history}
+                                            </h3>
+                                            <p className="text-slate-700 leading-relaxed text-sm text-justify mb-4">{selectedItem.process[lang]}</p>
+                                            <div className="bg-blue-50/50 p-3 rounded border-l-4 border-blue-400">
+                                                <p className="text-blue-900 text-sm font-medium">
+                                                    <span className="font-bold">{t.impact}</span>{selectedItem.impact[lang]}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {selectedItem.quotes.length > 0 && (
+                                            <div>
+                                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">
+                                                    <Icons.BookOpen className="w-4 h-4 text-emerald-600" />
+                                                    {t.quotesH}
+                                                </h3>
+                                                <div className="space-y-3">
+                                                    {selectedItem.quotes.map((quote, idx) => (
+                                                        <div key={idx} className="relative pl-4 border-l-2 border-emerald-200">
+                                                            <blockquote className="text-sm text-slate-700 font-serif italic mb-1">“{quote.text}”</blockquote>
+                                                            {lang === 'en' && quote.trans && (
+                                                                <p className="text-xs text-slate-500 italic mb-1 leading-relaxed">{quote.trans}</p>
+                                                            )}
+                                                            <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+                                                                <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-1.5 rounded">{quote.source[lang]}</span>
+                                                                {quote.note && quote.note[lang] && <span className="text-xs text-slate-400">{quote.note[lang]}</span>}
+                                                                {quote.ctext && (
+                                                                    <a href={quote.ctext} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">{t.ctextLink} ↗</a>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedItem.poems.length > 0 && (
+                                            <div>
+                                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">
+                                                    <Icons.Feather className="w-4 h-4 text-purple-600" />
+                                                    {t.poemsH}
+                                                </h3>
+                                                <div className="space-y-3">
+                                                    {selectedItem.poems.map((poem, idx) => (
+                                                        <div key={idx} className="bg-purple-50/50 p-3 rounded-lg border border-purple-100">
+                                                            <p className="text-sm text-slate-800 font-serif mb-2 leading-relaxed">{poem.text}</p>
+                                                            {lang === 'en' && poem.trans && (
+                                                                <p className="text-xs text-slate-500 italic mb-2 leading-relaxed">{poem.trans}</p>
+                                                            )}
+                                                            <div className="flex items-center justify-end gap-2 text-xs">
+                                                                <span className="text-purple-700 font-bold">{poem.author[lang]}</span>
+                                                                <span className="text-slate-400">《{poem.title[lang]}》</span>
+                                                            </div>
+                                                            {((lang === 'zh' && poem.note && poem.note.zh) || (lang === 'en' && poem.note && poem.note.en) || poem.ctext) && (
+                                                                <div className="mt-2 pt-2 border-t border-purple-100 text-xs text-slate-500 flex items-center justify-between gap-2">
+                                                                    <span>{poem.note ? poem.note[lang] : ''}</span>
+                                                                    {poem.ctext && <a href={poem.ctext} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline shrink-0">ctext ↗</a>}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ZuoZhuanMap />);
+    </script>
+</body>
+</html>
